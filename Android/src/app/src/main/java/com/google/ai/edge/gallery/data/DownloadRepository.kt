@@ -24,6 +24,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
@@ -338,13 +339,17 @@ class DefaultDownloadRepository(
         .setAutoCancel(true)
 
     with(NotificationManagerCompat.from(context)) {
-      // notificationId is a unique int for each notification that you must define
-      if (
-        ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
-          PackageManager.PERMISSION_GRANTED
-      ) {
-        // Permission not granted, return or handle accordingly. In real app, request permission.
-        return
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        if (
+          ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+          return
+        }
+      } else {
+        if (!areNotificationsEnabled()) {
+          return
+        }
       }
       notify(1, builder.build())
     }

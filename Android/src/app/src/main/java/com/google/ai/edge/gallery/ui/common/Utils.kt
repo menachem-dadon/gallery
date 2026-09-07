@@ -223,19 +223,14 @@ fun checkNotificationPermissionAndStartDownload(
   task: Task?,
   model: Model,
 ) {
-  // Check permission
-  when (PackageManager.PERMISSION_GRANTED) {
-    // Already got permission. Call the lambda.
-    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) -> {
-      modelManagerViewModel.downloadModel(task = task, model = model)
-    }
-
-    // Otherwise, ask for permission
-    else -> {
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
-      }
-    }
+  if (
+    Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+      ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+        PackageManager.PERMISSION_GRANTED
+  ) {
+    modelManagerViewModel.downloadModel(task = task, model = model)
+  } else {
+    launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
   }
 }
 

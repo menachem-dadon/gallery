@@ -19,7 +19,7 @@
     package="com.google.ai.edge.gallery.worker">
 
   <uses-sdk
-      android:minSdkVersion="31"
+      android:minSdkVersion="28"
       android:targetSdkVersion="35"/>
   <application/>
 </manifest>
