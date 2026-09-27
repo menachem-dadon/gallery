@@ -65,7 +65,7 @@ import com.google.ai.edge.gallery.R
 import com.google.ai.edge.gallery.data.ConfigKeys
 import com.google.ai.edge.gallery.data.Model
 import com.google.ai.edge.gallery.data.Task
-import com.google.ai.edge.gallery.ui.common.BufferedFadingMarkdownText
+import com.google.ai.edge.gallery.ui.common.StableMarkdownText
 import com.google.ai.edge.gallery.ui.common.ScrollToBottomButton
 import com.google.ai.edge.gallery.ui.common.chat.MessageBodyLoading
 import com.google.ai.edge.gallery.ui.modelmanager.ModelManagerViewModel
@@ -172,9 +172,8 @@ fun ResponsePanel(
           if (selectedOptionIndex == 0) {
             Box(contentAlignment = Alignment.BottomEnd, modifier = Modifier.weight(1f)) {
               Column(modifier = Modifier.fillMaxSize().verticalScroll(responseScrollState)) {
-                BufferedFadingMarkdownText(
+                StableMarkdownText(
                   text = response,
-                  inProgress = uiState.inProgress,
                   modifier =
                     Modifier.padding(top = 8.dp, bottom = 40.dp).semantics {
                       // Only announce when message is complete.

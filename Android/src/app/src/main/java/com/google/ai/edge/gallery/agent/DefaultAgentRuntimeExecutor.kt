@@ -77,7 +77,8 @@ open class DefaultAgentRuntimeExecutor(
     onDone: (String) -> Unit,
   ) {
     val effectiveSessionId = config.sessionId.ifEmpty { UUID.randomUUID().toString() }
-    val systemInstruction = Contents.of(config.systemInstruction ?: "")
+    val systemInstruction =
+      config.systemInstruction?.trim()?.ifEmpty { null }?.let { Contents.of(it) }
     val executionContext =
       ToolExecutionContext(taskId = config.taskId, actionChannel = config.actionChannel)
 

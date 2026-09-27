@@ -17,6 +17,7 @@
 package com.google.ai.edge.gallery.customtasks.agentchat
 
 import android.content.Context
+import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.DataStoreFactory
@@ -32,6 +33,7 @@ import com.google.ai.edge.gallery.customtasks.common.CustomTask
 import com.google.ai.edge.gallery.customtasks.common.CustomTaskDataForBuiltinTask
 import com.google.ai.edge.gallery.data.BuiltInTaskId
 import com.google.ai.edge.gallery.data.Category
+import com.google.ai.edge.gallery.data.DataStoreRepository
 import com.google.ai.edge.gallery.data.Model
 import com.google.ai.edge.gallery.data.Task
 import com.google.ai.edge.gallery.proto.McpServers
@@ -156,42 +158,57 @@ constructor(
   ) {
     val initialSystemPrompt = systemInstruction?.toString() ?: task.defaultSystemPrompt
     coroutineScope.launch(Dispatchers.Default) {
-      val skillsJob = launch {
-        agentTools.skillsProvider.loadSkills(SkillManagerViewModel.getDefaultDisabledSkills(model))
-      }
-      val mcpJob = launch { agentTools.mcpManagerViewModel.loadMcpServers() }
-      skillsJob.join()
-      mcpJob.join()
+      try {
+        val skillsJob = launch {
+          try {
+            agentTools.skillsProvider.loadSkills(SkillManagerViewModel.getDefaultDisabledSkills(model))
+          } catch (e: Exception) {
+            Log.w(TAG, "Failed to load skills: ${e.message}")
+          }
+        }
+        val mcpJob = launch {
+          try {
+            agentTools.mcpManagerViewModel?.loadMcpServers()
+          } catch (e: Exception) {
+            Log.w(TAG, "Failed to load MCP servers: ${e.message}")
+          }
+        }
+        skillsJob.join()
+        mcpJob.join()
 
-      // Determine base system prompt based on whether MCP tools are enabled.
-      val toolsPrompt = agentTools.mcpManagerViewModel.getToolsPrompt()
-      val baseSystemPrompt =
-        getEffectiveBaseSystemPrompt(initialSystemPrompt, toolsPrompt.isNotEmpty())
+        // Determine base system prompt based on whether MCP tools are enabled.
+        val toolsPrompt = agentTools.mcpManagerViewModel?.getToolsPrompt() ?: ""
+        val baseSystemPrompt =
+          getEffectiveBaseSystemPrompt(initialSystemPrompt, toolsPrompt.isNotEmpty())
 
-      // TODO: inject prompt expander as a dependency.
-      val finalSystemPrompt =
-        PromptExpander()
-          .formatSystemInstructions(
-            template = baseSystemPrompt,
-            substitutions =
-              mapOf(
-                "___SKILLS___" to formatSelectedSkills(skillsProvider.getAvailableSkills()),
-                "___TOOLS___" to toolsPrompt,
-              ),
+        // TODO: inject prompt expander as a dependency.
+        val finalSystemPrompt =
+          PromptExpander()
+            .formatSystemInstructions(
+              template = baseSystemPrompt,
+              substitutions =
+                mapOf(
+                  "___SKILLS___" to formatSelectedSkills(skillsProvider.getAvailableSkills()),
+                  "___TOOLS___" to toolsPrompt,
+                ),
+            )
+
+        val config =
+          AgentRuntimeConfig(
+            model = model,
+            taskId = task.id,
+            actionChannel = agentTools.sendActionChannel,
+            supportImage = model.llmSupportImage,
+            supportAudio = model.llmSupportAudio,
+            enableConversationConstrainedDecoding = true,
+            systemInstruction = finalSystemPrompt,
           )
 
-      val config =
-        AgentRuntimeConfig(
-          model = model,
-          taskId = task.id,
-          actionChannel = agentTools.sendActionChannel,
-          supportImage = model.llmSupportImage,
-          supportAudio = model.llmSupportAudio,
-          enableConversationConstrainedDecoding = true,
-          systemInstruction = finalSystemPrompt,
-        )
-
-      executor.initialize(context = context, config = config, onDone = onDone)
+        executor.initialize(context = context, config = config, onDone = onDone)
+      } catch (e: Throwable) {
+        Log.e(TAG, "Failed to initialize AgentChatTask", e)
+        onDone(e.message ?: "Failed to initialize AgentChatTask")
+      }
     }
   }
 
@@ -222,8 +239,17 @@ constructor(
 internal object AgentChatTaskModule {
   @Provides
   @Singleton
-  fun provideAgentTools(skillManager: SkillManager): AgentTools {
-    return AgentToolsImpl().apply { skillsProvider = skillManager }
+  fun provideAgentTools(
+    @ApplicationContext context: Context,
+    skillManager: SkillManager,
+    dataStoreRepository: DataStoreRepository,
+  ): AgentTools {
+    return AgentToolsImpl().apply {
+      this.context = context
+      this.skillsProvider = skillManager
+      this.dataStoreRepository = dataStoreRepository
+      this.taskId = BuiltInTaskId.LLM_AGENT_CHAT
+    }
   }
 
   @Provides

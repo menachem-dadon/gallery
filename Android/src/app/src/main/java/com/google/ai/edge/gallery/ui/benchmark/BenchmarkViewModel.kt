@@ -146,7 +146,7 @@ constructor(
             "gpu" -> Backend.GPU()
             "npu",
             "tpu" -> Backend.NPU(nativeLibraryDir = appContext.applicationInfo.nativeLibraryDir)
-            else -> Backend.CPU()
+            else -> Backend.CPU(maxOf(2, minOf(4, Runtime.getRuntime().availableProcessors())))
           }
         val modelPath = model.getPath(context = appContext)
         for (i in 0 until runCount) {

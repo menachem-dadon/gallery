@@ -32,13 +32,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.SendChannel
+import com.google.ai.edge.gallery.mcp.McpServerState
+import com.google.ai.edge.gallery.mcp.McpServersProvider
 import kotlinx.coroutines.runBlocking
 
 interface AgentTools : ToolsProvider {
   var context: Context
   var skillsProvider: SkillsProvider
   var dataStoreRepository: DataStoreRepository
-  var mcpManagerViewModel: McpManagerViewModel
+  var mcpManagerViewModel: McpManagerViewModel?
   var taskId: String
   val receiveActionChannel: ReceiveChannel<ToolAction>
   val sendActionChannel: SendChannel<ToolAction>
@@ -52,8 +54,8 @@ open class AgentToolsImpl : AgentTools {
   override lateinit var context: Context
   override lateinit var skillsProvider: SkillsProvider
   override lateinit var dataStoreRepository: DataStoreRepository
-  override lateinit var mcpManagerViewModel: McpManagerViewModel
-  override lateinit var taskId: String
+  override var mcpManagerViewModel: McpManagerViewModel? = null
+  override var taskId: String = ""
 
   private val _actionChannel = Channel<ToolAction>(Channel.UNLIMITED)
   override val receiveActionChannel: ReceiveChannel<ToolAction> = _actionChannel
@@ -65,7 +67,11 @@ open class AgentToolsImpl : AgentTools {
 
   val runMcpTool by lazy {
     RunMcpTool(
-      mcpServersProvider = mcpManagerViewModel,
+      mcpServersProvider =
+        object : McpServersProvider {
+          override val mcpServers: List<McpServerState>
+            get() = mcpManagerViewModel?.mcpServers ?: emptyList()
+        },
       skillsProvider = skillsProvider,
       taskId = taskId,
     )

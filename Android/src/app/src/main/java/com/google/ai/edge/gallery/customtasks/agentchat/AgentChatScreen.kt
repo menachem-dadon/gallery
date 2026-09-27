@@ -762,7 +762,7 @@ private fun resetSessionWithCurrentSkillsAndMcps(
 ) {
   val model = modelManagerViewModel.uiState.value.selectedModel
   val litertMessages = initialMessages.mapNotNull { convertToLitertMessage(it) }
-  val toolsPrompt = agentTools.mcpManagerViewModel.getToolsPrompt()
+  val toolsPrompt = agentTools.mcpManagerViewModel?.getToolsPrompt() ?: ""
   val actualSystemPrompt = getEffectiveBaseSystemPrompt(curSystemPrompt, toolsPrompt.isNotEmpty())
 
   val selectedSkills =

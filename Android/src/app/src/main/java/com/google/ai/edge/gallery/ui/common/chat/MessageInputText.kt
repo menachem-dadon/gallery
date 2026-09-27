@@ -44,6 +44,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.lifecycle.awaitInstance
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -70,6 +71,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.rounded.AudioFile
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.FlipCameraAndroid
@@ -78,6 +80,7 @@ import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Photo
 import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -114,6 +117,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -179,6 +183,9 @@ fun MessageInputText(
   showMcpPicker: Boolean = false,
   showImagePicker: Boolean = false,
   showAudioPicker: Boolean = false,
+  showThinkingToggle: Boolean = false,
+  thinkingEnabled: Boolean = false,
+  onThinkingToggled: (Boolean) -> Unit = {},
   showStopButtonWhenInProgress: Boolean = false,
   onImageLimitExceeded: () -> Unit = {},
   onImagesIgnored: () -> Unit = {},
@@ -652,6 +659,48 @@ fun MessageInputText(
                           showTextInputHistorySheet = true
                         },
                       )
+                    }
+                  }
+
+                  if (showThinkingToggle) {
+                    val thinkingStateLabel =
+                      stringResource(
+                        if (thinkingEnabled) R.string.thinking_mode_on
+                        else R.string.thinking_mode_off
+                      )
+                    OutlinedButton(
+                      onClick = { onThinkingToggled(!thinkingEnabled) },
+                      enabled =
+                        !inProgress &&
+                          !isResettingSession &&
+                          !modelInitializing &&
+                          !modelPreparing,
+                      modifier = Modifier.semantics { stateDescription = thinkingStateLabel },
+                      shape = RoundedCornerShape(12.dp),
+                      border =
+                        BorderStroke(
+                          1.dp,
+                          if (thinkingEnabled) MaterialTheme.colorScheme.primary
+                          else MaterialTheme.colorScheme.outlineVariant,
+                        ),
+                      colors =
+                        ButtonDefaults.outlinedButtonColors(
+                          containerColor =
+                            if (thinkingEnabled) MaterialTheme.colorScheme.primaryContainer
+                            else MaterialTheme.colorScheme.surface,
+                          contentColor =
+                            if (thinkingEnabled) MaterialTheme.colorScheme.onPrimaryContainer
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
+                      contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                    ) {
+                      Icon(
+                        Icons.Outlined.Psychology,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                      )
+                      Spacer(modifier = Modifier.width(6.dp))
+                      Text(thinkingStateLabel, style = MaterialTheme.typography.labelMedium)
                     }
                   }
 

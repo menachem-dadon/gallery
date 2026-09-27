@@ -64,6 +64,8 @@ message LlmConfig {
   bool support_mobile_actions = 9;
   bool support_thinking = 10;
   bool support_speculative_decoding = 11;
+  // Maximum context supported by this imported LiteRT-LM model file.
+  int32 max_context_length = 12;
 }
 
 message Settings {
@@ -80,6 +82,8 @@ message Settings {
 
   repeated string viewed_promo_id = 10;
   bool disable_firebase_analytics = 11;
+  // Thinking mode is a per-model chat preference and survives app restarts.
+  map<string, bool> thinking_enabled_by_model = 12;
 }
 
 message McpAuth {

@@ -59,6 +59,8 @@
   <string name="chat_you" translatable="true" description="Label indicating a message was sent by the user. [CHAR_LIMIT=18]">You</string>
   <string name="chat_llm_agent_name" translatable="true" description="Display name for the LLM agent in chat. [CHAR_LIMIT=18]">LLM</string>
   <string name="show_thinking" translatable="true" description="Label for a button to show the model's reasoning/thinking steps. [CHAR_LIMIT=24]">Show thinking</string>
+  <string name="thinking_mode_on">Thinking on</string>
+  <string name="thinking_mode_off">Thinking off</string>
   <string name="checking_access" translatable="true" description="Message shown while checking if the user has access to a model. [CHAR_LIMIT=31]">Checking access...</string>
   <string name="close" translatable="true" description="Common button label to close a screen or dialog. [CHAR_LIMIT=9]">Close</string>
   <string name="collapse_all" translatable="true" description="Button label to collapse all expanded sections. [CHAR_LIMIT=23]">Collapse all</string>
@@ -714,6 +716,7 @@
   <string name="config_label_temperature" translatable="false">Temperature</string>
   <!-- Label for the 'Default max tokens' option in the model configuration dialog. -->
   <string name="config_label_default_max_tokens" translatable="false">Default max tokens</string>
+  <string name="config_label_model_context_length">Model file context limit (tokens)</string>
   <!-- Label for the 'Default TopK' option in the model configuration dialog. -->
   <string name="config_label_default_topk" translatable="false">Default TopK</string>
   <!-- Label for the 'Default TopP' option in the model configuration dialog. -->
@@ -732,8 +735,6 @@
   <string name="config_label_support_thinking" translatable="false">Support thinking</string>
   <!-- Label for the 'Support speculative decoding' option in the model configuration dialog. -->
   <string name="config_label_support_speculative_decoding" translatable="false">Support speculative decoding</string>
-  <!-- Label for the 'Enable thinking' option in the model configuration dialog. -->
-  <string name="config_label_enable_thinking" translatable="false">Enable thinking</string>
   <!-- Label for the 'Enable speculative decoding' option in the model configuration dialog. -->
   <string name="config_label_enable_speculative_decoding" translatable="false">Enable speculative decoding</string>
   <!-- Label for the 'Max result count' option in the model configuration dialog. -->

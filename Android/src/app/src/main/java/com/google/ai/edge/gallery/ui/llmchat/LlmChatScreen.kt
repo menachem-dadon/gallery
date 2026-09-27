@@ -277,7 +277,9 @@ fun ChatViewWrapper(
               modelManagerViewModel = modelManagerViewModel,
             )
           },
-          allowThinking = task.allowCapability(ModelCapability.LLM_THINKING, model),
+          enableThinking =
+            task.allowCapability(ModelCapability.LLM_THINKING, model) &&
+              modelManagerViewModel.isThinkingEnabled(model),
         )
 
         val activeSkills = getActiveSkills()
@@ -316,7 +318,9 @@ fun ChatViewWrapper(
               modelManagerViewModel = modelManagerViewModel,
             )
           },
-          allowThinking = task.allowCapability(ModelCapability.LLM_THINKING, model),
+          enableThinking =
+            task.allowCapability(ModelCapability.LLM_THINKING, model) &&
+              modelManagerViewModel.isThinkingEnabled(model),
         )
       }
     },
@@ -330,8 +334,8 @@ fun ChatViewWrapper(
           task = task,
           model = model,
           systemInstruction = curSystemPrompt,
-          supportImage = showImagePicker,
-          supportAudio = showAudioPicker,
+          supportImage = showImagePicker && model.llmSupportImage,
+          supportAudio = showAudioPicker && model.llmSupportAudio,
           initialMessages = litertMessages,
           clearHistory = clearHistory,
         )

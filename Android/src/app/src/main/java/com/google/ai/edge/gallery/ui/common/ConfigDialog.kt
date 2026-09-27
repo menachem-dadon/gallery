@@ -436,7 +436,7 @@ fun NumberSliderRow(config: NumberSliderConfig, values: SnapshotStateMap<String,
       }
     }
 
-    if (config.key == ConfigKeys.MAX_TOKENS) {
+    if (config.key == ConfigKeys.MAX_TOKENS || config.key == ConfigKeys.MODEL_CONTEXT_LENGTH) {
       val sliderValue =
         try {
           values[config.key.label] as Float

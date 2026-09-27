@@ -52,6 +52,7 @@ import com.google.ai.edge.litertlm.MessageCallback
 import com.google.ai.edge.litertlm.SamplerConfig
 import com.google.ai.edge.litertlm.ToolProvider
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.util.concurrent.CancellationException
 import kotlinx.coroutines.CoroutineScope
 
@@ -97,42 +98,47 @@ object LlmChatModelHelper : LlmModelHelper {
         key = ConfigKeys.VISION_ACCELERATOR,
         defaultValue = DEFAULT_VISION_ACCELERATOR.label,
       )
-    val visionBackend =
-      when (visionAccelerator) {
-        Accelerator.CPU.label -> Backend.CPU()
-        Accelerator.GPU.label -> Backend.GPU()
-        Accelerator.NPU.label ->
-          Backend.NPU(nativeLibraryDir = context.applicationInfo.nativeLibraryDir)
-        Accelerator.TPU.label ->
-          Backend.NPU(nativeLibraryDir = context.applicationInfo.nativeLibraryDir)
-        else -> Backend.GPU()
-      }
     val shouldEnableImage = supportImage
     val shouldEnableAudio = supportAudio
+    val optimalCpuThreads = maxOf(2, minOf(4, Runtime.getRuntime().availableProcessors()))
     val preferredBackend =
       when (accelerator) {
-        Accelerator.CPU.label -> Backend.CPU()
+        Accelerator.CPU.label -> Backend.CPU(optimalCpuThreads)
         Accelerator.GPU.label -> Backend.GPU()
         Accelerator.NPU.label ->
           Backend.NPU(nativeLibraryDir = context.applicationInfo.nativeLibraryDir)
         Accelerator.TPU.label ->
           Backend.NPU(nativeLibraryDir = context.applicationInfo.nativeLibraryDir)
-        else -> Backend.CPU()
+        else -> Backend.CPU(optimalCpuThreads)
       }
-    Log.d(TAG, "Preferred backend: $preferredBackend")
+    Log.d(TAG, "Preferred backend: $preferredBackend (CPU threads: $optimalCpuThreads)")
+
+    val visionBackend =
+      when (visionAccelerator) {
+        Accelerator.CPU.label -> Backend.CPU(optimalCpuThreads)
+        Accelerator.GPU.label -> if (preferredBackend is Backend.CPU) Backend.CPU(optimalCpuThreads) else Backend.GPU()
+        Accelerator.NPU.label ->
+          Backend.NPU(nativeLibraryDir = context.applicationInfo.nativeLibraryDir)
+        Accelerator.TPU.label ->
+          Backend.NPU(nativeLibraryDir = context.applicationInfo.nativeLibraryDir)
+        else -> if (preferredBackend is Backend.CPU) Backend.CPU(optimalCpuThreads) else Backend.GPU()
+      }
 
     val modelPath = model.getPath(context = context)
+    val cacheDir =
+      if (modelPath.startsWith("/data/local/tmp")) {
+        context.getExternalFilesDir(null)?.absolutePath
+      } else {
+        null
+      }
     val engineConfig =
       EngineConfig(
         modelPath = modelPath,
         backend = preferredBackend,
         visionBackend = if (shouldEnableImage) visionBackend else null, // must be GPU for Gemma 3n
-        audioBackend = if (shouldEnableAudio) Backend.CPU() else null, // must be CPU for Gemma 3n
+        audioBackend = if (shouldEnableAudio) Backend.CPU(optimalCpuThreads) else null, // must be CPU for Gemma 3n
         maxNumTokens = maxTokens,
-        cacheDir =
-          if (modelPath.startsWith("/data/local/tmp"))
-            context.getExternalFilesDir(null)?.absolutePath
-          else null,
+        cacheDir = cacheDir,
       )
 
     // Check if the model file supports speculative decoding.
@@ -163,31 +169,80 @@ object LlmChatModelHelper : LlmModelHelper {
       }
       ExperimentalFlags.enableSpeculativeDecoding = speculativeDecoding
       Log.d(TAG, "Speculative decoding enabled: $speculativeDecoding")
-      val engine = Engine(engineConfig)
-      engine.initialize()
+      var activeEngine = Engine(engineConfig)
+      try {
+        activeEngine.initialize()
+      } catch (e: Exception) {
+        Log.w(TAG, "Backend initialization failed: ${e.message}. Attempting CPU fallback.")
+        try {
+          val fallbackConfig =
+            engineConfig.copy(
+              backend = Backend.CPU(optimalCpuThreads),
+              visionBackend = if (shouldEnableImage) Backend.CPU(optimalCpuThreads) else null,
+              audioBackend = if (shouldEnableAudio) Backend.CPU(optimalCpuThreads) else null,
+            )
+          activeEngine = Engine(fallbackConfig)
+          activeEngine.initialize()
+        } catch (e2: Exception) {
+          if (shouldEnableImage || shouldEnableAudio) {
+            Log.w(TAG, "Multimodal CPU initialization failed: ${e2.message}. Falling back to text-only CPU.")
+            val textOnlyConfig =
+              engineConfig.copy(
+                backend = Backend.CPU(optimalCpuThreads),
+                visionBackend = null,
+                audioBackend = null,
+              )
+            activeEngine = Engine(textOnlyConfig)
+            activeEngine.initialize()
+          } else {
+            throw e2
+          }
+        }
+      }
       ExperimentalFlags.enableSpeculativeDecoding = false
 
       ExperimentalFlags.enableConversationConstrainedDecoding =
         enableConversationConstrainedDecoding
       val conversation =
-        engine.createConversation(
-          ConversationConfig(
-            samplerConfig =
-              if (preferredBackend is Backend.NPU) {
-                null
-              } else {
-                SamplerConfig(
-                  topK = topK,
-                  topP = topP.toDouble(),
-                  temperature = temperature.toDouble(),
-                )
-              },
-            systemInstruction = systemInstruction,
-            tools = tools,
+        try {
+          activeEngine.createConversation(
+            ConversationConfig(
+              samplerConfig =
+                if (preferredBackend is Backend.NPU) {
+                  null
+                } else {
+                  SamplerConfig(
+                    topK = topK,
+                    topP = topP.toDouble(),
+                    temperature = temperature.toDouble(),
+                  )
+                },
+              systemInstruction = systemInstruction,
+              tools = tools,
+            )
           )
-        )
+        } catch (e: Exception) {
+          Log.w(TAG, "createConversation failed with constrained decoding/tools: ${e.message}. Retrying plain conversation.")
+          ExperimentalFlags.enableConversationConstrainedDecoding = false
+          activeEngine.createConversation(
+            ConversationConfig(
+              samplerConfig =
+                if (preferredBackend is Backend.NPU) {
+                  null
+                } else {
+                  SamplerConfig(
+                    topK = topK,
+                    topP = topP.toDouble(),
+                    temperature = temperature.toDouble(),
+                  )
+                },
+              systemInstruction = systemInstruction,
+              tools = emptyList(),
+            )
+          )
+        }
       ExperimentalFlags.enableConversationConstrainedDecoding = false
-      model.instance = LlmModelInstance(engine = engine, conversation = conversation)
+      model.instance = LlmModelInstance(engine = activeEngine, conversation = conversation)
     } catch (e: Exception) {
       val errorMsg = cleanUpMediapipeTaskErrorMessage(e.message ?: "Unknown error")
       model.markInitializationFailed(errorMsg)
@@ -317,11 +372,20 @@ object LlmChatModelHelper : LlmModelHelper {
       cleanUpListeners[model.name] = cleanUpListener
     }
 
+    if (images.isNotEmpty() && !model.llmSupportImage) {
+      onError("This model does not support image input.")
+      return
+    }
+    if (audioClips.isNotEmpty() && !model.llmSupportAudio) {
+      onError("This model does not support audio input.")
+      return
+    }
+
     val conversation = instance.conversation
 
     val contents = mutableListOf<Content>()
     for (image in images) {
-      contents.add(Content.ImageBytes(image.toPngByteArray()))
+      contents.add(Content.ImageBytes(image.toOptimizedImageByteArray()))
     }
     for (audioClip in audioClips) {
       contents.add(Content.AudioBytes(audioClip))
@@ -331,39 +395,58 @@ object LlmChatModelHelper : LlmModelHelper {
       contents.add(Content.Text(input))
     }
 
-    // Set enable_thinking to false by default using boolean literals for proper JSON serialization.
+    // Set enable_thinking to true only if requested.
     val enableThinking = extraContext?.get("enable_thinking") == "true"
     val finalExtraContext: Map<String, Any> =
-      (extraContext ?: emptyMap()) + ("enable_thinking" to enableThinking)
+      if (enableThinking) {
+        (extraContext ?: emptyMap()) + ("enable_thinking" to true)
+      } else {
+        extraContext ?: emptyMap()
+      }
 
-    conversation.sendMessageAsync(
-      Contents.of(contents),
-      object : MessageCallback {
-        override fun onMessage(message: Message) {
-          resultListener(message.toString(), false, message.channels[THOUGHT_CHANNEL])
-        }
-
-        override fun onDone() {
-          resultListener("", true, null)
-        }
-
-        override fun onError(throwable: Throwable) {
-          if (throwable is CancellationException) {
-            Log.i(TAG, "The inference is cancelled.")
-            resultListener("", true, null)
-          } else {
-            Log.e(TAG, "onError", throwable)
-            onError("Error: ${throwable.message}")
+    try {
+      conversation.sendMessageAsync(
+        Contents.of(contents),
+        object : MessageCallback {
+          override fun onMessage(message: Message) {
+            resultListener(message.toString(), false, message.channels[THOUGHT_CHANNEL])
           }
-        }
-      },
-      finalExtraContext,
-    )
+
+          override fun onDone() {
+            resultListener("", true, null)
+          }
+
+          override fun onError(throwable: Throwable) {
+            if (throwable is CancellationException) {
+              Log.i(TAG, "The inference is cancelled.")
+              resultListener("", true, null)
+            } else {
+              Log.e(TAG, "onError in sendMessageAsync", throwable)
+              onError("Error: ${throwable.message ?: throwable.javaClass.simpleName}")
+            }
+          }
+        },
+        finalExtraContext,
+      )
+    } catch (t: Throwable) {
+      Log.e(TAG, "Exception during sendMessageAsync", t)
+      onError("Failed to process message: ${t.message ?: t.javaClass.simpleName}")
+    }
   }
 
-  private fun Bitmap.toPngByteArray(): ByteArray {
+  private fun Bitmap.toOptimizedImageByteArray(): ByteArray {
+    val maxDimension = 1024
+    val scaledBitmap =
+      if (width > maxDimension || height > maxDimension) {
+        val scale = maxDimension.toFloat() / maxOf(width, height)
+        val newWidth = (width * scale).toInt()
+        val newHeight = (height * scale).toInt()
+        Bitmap.createScaledBitmap(this, newWidth, newHeight, true)
+      } else {
+        this
+      }
     val stream = ByteArrayOutputStream()
-    this.compress(Bitmap.CompressFormat.PNG, 100, stream)
+    scaledBitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
     return stream.toByteArray()
   }
 }

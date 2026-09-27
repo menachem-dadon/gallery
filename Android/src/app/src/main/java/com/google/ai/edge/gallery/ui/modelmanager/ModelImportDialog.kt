@@ -116,6 +116,13 @@ private val IMPORT_CONFIGS_LLM: List<Config> =
     LabelConfig(key = ConfigKeys.NAME),
     LabelConfig(key = ConfigKeys.MODEL_TYPE),
     NumberSliderConfig(
+      key = ConfigKeys.MODEL_CONTEXT_LENGTH,
+      sliderMin = 256f,
+      sliderMax = 262144f,
+      defaultValue = 4096f,
+      valueType = ValueType.INT,
+    ),
+    NumberSliderConfig(
       key = ConfigKeys.DEFAULT_MAX_TOKENS,
       sliderMin = 100f,
       sliderMax = 4096f,
@@ -274,6 +281,12 @@ fun ModelImportDialog(
                   valueType = ValueType.INT,
                 )
                   as Int
+              val maxContextLength =
+                convertValueToTargetType(
+                  value = values.get(ConfigKeys.MODEL_CONTEXT_LENGTH.label)!!,
+                  valueType = ValueType.INT,
+                )
+                  as Int
               val defaultTopk =
                 convertValueToTargetType(
                   value = values.get(ConfigKeys.DEFAULT_TOPK.label)!!,
@@ -335,7 +348,8 @@ fun ModelImportDialog(
                 this.url = if (isHttpOrHttps(uri)) downloadUrl else ""
                 this.llmConfig = llmConfig {
                   compatibleAccelerators += supportedAccelerators
-                  this.defaultMaxTokens = defaultMaxTokens
+                  this.defaultMaxTokens = minOf(defaultMaxTokens, maxContextLength)
+                  this.maxContextLength = maxContextLength
                   this.defaultTopk = defaultTopk
                   this.defaultTopp = defaultTopp
                   this.defaultTemperature = defaultTemperature

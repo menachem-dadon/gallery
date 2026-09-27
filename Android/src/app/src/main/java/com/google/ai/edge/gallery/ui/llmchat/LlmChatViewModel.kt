@@ -30,6 +30,7 @@ import com.google.ai.edge.gallery.agent.AiChatExecutor
 import com.google.ai.edge.gallery.agent.Attachment
 import com.google.ai.edge.gallery.agent.sessions.LlmSessionManager
 import com.google.ai.edge.gallery.common.SystemPromptHelper
+import com.google.ai.edge.gallery.data.BuiltInTaskId
 import com.google.ai.edge.gallery.data.ChatSessionRepository
 import com.google.ai.edge.gallery.data.ConfigKeys
 import com.google.ai.edge.gallery.data.Model
@@ -143,7 +144,7 @@ open class LlmChatViewModelBase(
     onFirstToken: (Model) -> Unit = {},
     onDone: () -> Unit = {},
     onError: (String) -> Unit,
-    allowThinking: Boolean = false,
+    enableThinking: Boolean = false,
   ) {
     val accelerator = model.getStringConfigValue(key = ConfigKeys.ACCELERATOR, defaultValue = "")
     viewModelScope.launch(Dispatchers.Default) {
@@ -161,9 +162,6 @@ open class LlmChatViewModelBase(
         attachments.add(Attachment.AudioBytes(audioMessage.genByteArrayForWav()))
       }
 
-      val enableThinking =
-        allowThinking &&
-          model.getBooleanConfigValue(key = ConfigKeys.ENABLE_THINKING, defaultValue = false)
       val extraContext = if (enableThinking) mapOf("enable_thinking" to "true") else emptyMap()
       val metadata =
         buildMap<String, Any> {
@@ -191,8 +189,8 @@ open class LlmChatViewModelBase(
           AgentRuntimeConfig(
             model = model,
             taskId = currentTaskId,
-            supportImage = model.llmSupportImage,
-            supportAudio = model.llmSupportAudio,
+            supportImage = (currentTaskId == BuiltInTaskId.LLM_ASK_IMAGE) || (currentTaskId == BuiltInTaskId.LLM_CHAT && model.llmSupportImage),
+            supportAudio = (currentTaskId == BuiltInTaskId.LLM_ASK_AUDIO) || (currentTaskId == BuiltInTaskId.LLM_CHAT && model.llmSupportAudio),
             systemInstruction = _uiSystemPrompt.value.ifEmpty { null },
             initialMessages = initialMessages,
           )
@@ -386,7 +384,7 @@ open class LlmChatViewModelBase(
     model: Model,
     message: ChatMessageText,
     onError: (String) -> Unit,
-    allowThinking: Boolean = false,
+    enableThinking: Boolean = false,
   ) {
     viewModelScope.launch(Dispatchers.Default) {
       // Wait for model to be initialized.
@@ -411,7 +409,7 @@ open class LlmChatViewModelBase(
         model = model,
         input = message.content,
         onError = onError,
-        allowThinking = allowThinking,
+        enableThinking = enableThinking,
       )
     }
   }

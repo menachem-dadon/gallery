@@ -29,8 +29,8 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.google.ai.edge.gallery.ui.common.BufferedFadingMarkdownText
 import com.google.ai.edge.gallery.ui.common.MarkdownText
+import com.google.ai.edge.gallery.ui.common.StableMarkdownText
 
 /** Composable function to display the text content of a ChatMessageText. */
 @Composable
@@ -51,9 +51,8 @@ fun MessageBodyText(
     }
   } else if (message.side == ChatSide.AGENT) {
     if (message.isMarkdown) {
-      BufferedFadingMarkdownText(
+      StableMarkdownText(
         text = message.content,
-        inProgress = inProgress,
         modifier =
           Modifier.padding(vertical = 12.dp)
             .padding(horizontal = horizontalPadding)

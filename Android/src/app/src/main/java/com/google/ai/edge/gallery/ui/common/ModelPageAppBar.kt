@@ -195,9 +195,6 @@ fun ModelPageAppBar(
     if (task.id != BuiltInTaskId.LLM_TINY_GARDEN) {
       modelConfigs.removeIf { it.key == ConfigKeys.RESET_CONVERSATION_TURN_COUNT }
     }
-    if (!task.allowCapability(ModelCapability.LLM_THINKING, model)) {
-      modelConfigs.removeIf { it.key == ConfigKeys.ENABLE_THINKING }
-    }
     var supportsSpeculativeDecoding = false
     // Check if the model file supports speculative decoding.
     try {

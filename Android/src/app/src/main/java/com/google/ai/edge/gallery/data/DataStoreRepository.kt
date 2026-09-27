@@ -40,6 +40,10 @@ interface DataStoreRepository {
 
   fun readTheme(): Theme
 
+  fun saveThinkingEnabled(modelName: String, enabled: Boolean)
+
+  fun readThinkingEnabledByModel(): Map<String, Boolean>
+
   /**
    * Saves the user's preference for whether Firebase Analytics data collection is enabled (`true`)
    * or disabled (`false`).
@@ -167,6 +171,18 @@ class DefaultDataStoreRepository(
       // Use "auto" as the default theme.
       if (curTheme == Theme.THEME_UNSPECIFIED) Theme.THEME_AUTO else curTheme
     }
+  }
+
+  override fun saveThinkingEnabled(modelName: String, enabled: Boolean) {
+    runBlocking {
+      dataStore.updateData { settings ->
+        settings.toBuilder().putThinkingEnabledByModel(modelName, enabled).build()
+      }
+    }
+  }
+
+  override fun readThinkingEnabledByModel(): Map<String, Boolean> {
+    return runBlocking { dataStore.data.first().thinkingEnabledByModelMap }
   }
 
   /**

@@ -136,6 +136,10 @@ data class AllowedModel(
       if (isPixel10()) {
         parsedAccelerators.remove(Accelerator.GPU)
       }
+      // For LLM models, ensure CPU is always available as an option.
+      if (isLlmModel && !parsedAccelerators.contains(Accelerator.CPU)) {
+        parsedAccelerators.add(Accelerator.CPU)
+      }
       if (parsedAccelerators.isNotEmpty()) {
         accelerators = parsedAccelerators
       }
@@ -178,9 +182,8 @@ data class AllowedModel(
               defaultTopP = defaultTopP,
               defaultTemperature = defaultTemperature,
               defaultMaxToken = llmMaxToken,
-              defaultMaxContextLength = llmMaxContextLength,
+              defaultMaxContextLength = llmMaxContextLength ?: llmMaxToken,
               accelerators = accelerators,
-              supportThinking = capabilities?.contains(ModelCapability.LLM_THINKING) == true,
               supportSpeculativeDecoding =
                 capabilities?.contains(ModelCapability.SPECULATIVE_DECODING) == true,
             )

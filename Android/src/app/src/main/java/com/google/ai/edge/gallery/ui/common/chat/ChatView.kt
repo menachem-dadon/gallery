@@ -84,6 +84,7 @@ import com.google.ai.edge.gallery.R
 import com.google.ai.edge.gallery.data.BuiltInTaskId
 import com.google.ai.edge.gallery.data.ConfigKeys
 import com.google.ai.edge.gallery.data.Model
+import com.google.ai.edge.gallery.data.ModelCapability
 import com.google.ai.edge.gallery.data.ModelDownloadStatusType
 import com.google.ai.edge.gallery.data.Task
 import com.google.ai.edge.gallery.firebaseAnalytics
@@ -399,6 +400,13 @@ fun ChatView(
                       showStopButtonInInputWhenInProgress = showStopButtonInInputWhenInProgress,
                       showImagePicker = showImagePicker,
                       showAudioPicker = showAudioPicker,
+                      showThinkingToggle =
+                        task.allowCapability(ModelCapability.LLM_THINKING, selectedModel),
+                      thinkingEnabled =
+                        modelManagerUiState.thinkingEnabledByModel[selectedModel.name] == true,
+                      onThinkingToggled = { enabled ->
+                        modelManagerViewModel.setThinkingEnabled(selectedModel, enabled)
+                      },
                       emptyStateComposable = emptyStateComposable,
                     )
                   // Model download

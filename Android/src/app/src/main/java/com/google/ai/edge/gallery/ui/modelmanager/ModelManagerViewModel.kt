@@ -81,6 +81,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import net.openid.appauth.AuthorizationException
 import net.openid.appauth.AuthorizationRequest
@@ -134,6 +136,7 @@ data class ModelManagerUiState(
 
   /** The history of text inputs entered by the user. */
   val textInputHistory: List<String> = listOf(),
+  val thinkingEnabledByModel: Map<String, Boolean> = mapOf(),
   val configValuesUpdateTrigger: Long = 0L,
   // Updated when model is imported of an imported model is deleted.
   val modelImportingUpdateTrigger: Long = 0L,
@@ -202,6 +205,7 @@ constructor(
   private val modelsDir = getModelStorageDir(context)
   protected val _uiState = MutableStateFlow(createEmptyUiState())
   open val uiState = _uiState.asStateFlow()
+  private val thinkingSaveMutex = Mutex()
 
   fun fetchModelDetails(modelId: String, onResult: (HfModelItemProto?) -> Unit) {
     viewModelScope.launch {
@@ -312,6 +316,22 @@ constructor(
 
   fun updateConfigValuesUpdateTrigger() {
     _uiState.update { it.copy(configValuesUpdateTrigger = System.currentTimeMillis()) }
+  }
+
+  fun isThinkingEnabled(model: Model): Boolean {
+    return _uiState.value.thinkingEnabledByModel[model.name] == true
+  }
+
+  fun setThinkingEnabled(model: Model, enabled: Boolean) {
+    _uiState.update { state ->
+      state.copy(thinkingEnabledByModel = state.thinkingEnabledByModel + (model.name to enabled))
+    }
+    viewModelScope.launch(Dispatchers.IO) {
+      thinkingSaveMutex.withLock {
+        // Read the latest value so rapid taps cannot persist an older state last.
+        dataStoreRepository.saveThinkingEnabled(model.name, isThinkingEnabled(model))
+      }
+    }
   }
 
   fun selectModel(model: Model) {
@@ -519,7 +539,7 @@ constructor(
             context = context,
             coroutineScope = viewModelScope,
             model = model,
-            systemInstruction = Contents.of(systemPrompt),
+            systemInstruction = systemPrompt.takeIf { it.isNotBlank() }?.let { Contents.of(it) },
             onDone = onDoneFn,
           )
       }
@@ -1260,6 +1280,8 @@ constructor(
       tasksByCategory = mapOf(),
       modelDownloadStatus = modelDownloadStatus,
       textInputHistory = textInputHistory,
+      thinkingEnabledByModel =
+        dataStoreRepository.readThinkingEnabledByModel() + _uiState.value.thinkingEnabledByModel,
       downloadOptionalComponents = _uiState.value.downloadOptionalComponents,
     )
   }
@@ -1278,6 +1300,8 @@ constructor(
         }
         .toMutableList()
     val llmMaxToken = info.llmConfig.defaultMaxTokens
+    val llmMaxContextLength =
+      info.llmConfig.maxContextLength.takeIf { it > 0 } ?: maxOf(4096, llmMaxToken)
     val llmSupportImage = info.llmConfig.supportImage
     val llmSupportAudio = info.llmConfig.supportAudio
     val llmSupportTinyGarden = info.llmConfig.supportTinyGarden
@@ -1287,11 +1311,11 @@ constructor(
     val configs: MutableList<Config> =
       createLlmChatConfigs(
           defaultMaxToken = llmMaxToken,
+          defaultMaxContextLength = llmMaxContextLength,
           defaultTopK = info.llmConfig.defaultTopk,
           defaultTopP = info.llmConfig.defaultTopp,
           defaultTemperature = info.llmConfig.defaultTemperature,
           accelerators = accelerators,
-          supportThinking = llmSupportThinking,
           supportSpeculativeDecoding = llmSupportSpeculativeDecoding,
         )
         .toMutableList()

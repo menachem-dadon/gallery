@@ -146,6 +146,9 @@ fun ChatPanel(
   showStopButtonInInputWhenInProgress: Boolean = false,
   showImagePicker: Boolean = false,
   showAudioPicker: Boolean = false,
+  showThinkingToggle: Boolean = false,
+  thinkingEnabled: Boolean = false,
+  onThinkingToggled: (Boolean) -> Unit = {},
   emptyStateComposable: @Composable (Model) -> Unit = {},
 ) {
   val uiState by viewModel.uiState.collectAsState()
@@ -704,6 +707,9 @@ fun ChatPanel(
         showMcpPicker = task.id === BuiltInTaskId.LLM_AGENT_CHAT,
         showImagePicker = showImagePicker,
         showAudioPicker = showAudioPicker,
+        showThinkingToggle = showThinkingToggle,
+        thinkingEnabled = thinkingEnabled,
+        onThinkingToggled = onThinkingToggled,
         showStopButtonWhenInProgress = showStopButtonInInputWhenInProgress,
         onImageLimitExceeded = { showImageLimitBanner = true },
         onImagesIgnored = {

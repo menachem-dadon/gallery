@@ -126,16 +126,18 @@ constructor(
     LaunchedEffect(task) { viewModel.loadSystemPrompt(task) }
     val uiSystemPrompt by viewModel.uiSystemPrompt.collectAsState()
     val systemPromptUpdatedMessage = stringResource(R.string.system_prompt_updated)
+    val selectedModel = myData.modelManagerViewModel.uiState.collectAsState().value.selectedModel
+    val modelSupportsImage = selectedModel?.llmSupportImage == true
+    val modelSupportsAudio = selectedModel?.llmSupportAudio == true
     LlmChatScreen(
       modelManagerViewModel = myData.modelManagerViewModel,
       navigateUp = myData.onNavUp,
       viewModel = viewModel,
       allowEditingSystemPrompt = true,
       curSystemPrompt = uiSystemPrompt,
-      showImagePicker = true,
-      showAudioPicker = true,
+      showImagePicker = modelSupportsImage,
+      showAudioPicker = modelSupportsAudio,
       onSystemPromptChanged = { newPrompt ->
-        val selectedModel = myData.modelManagerViewModel.uiState.value.selectedModel
         viewModel.applySystemPromptChange(
           task = task,
           model = selectedModel,

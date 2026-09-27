@@ -16,6 +16,7 @@
 
 package com.google.ai.edge.gallery.data
 
+import android.os.Build
 import androidx.annotation.StringRes
 import com.google.ai.edge.gallery.R
 import kotlin.math.abs
@@ -54,6 +55,8 @@ object ConfigKeys {
   val TEMPERATURE = ConfigKey("temperature", "Temperature", R.string.config_label_temperature)
   val DEFAULT_MAX_TOKENS =
     ConfigKey("default_max_tokens", "Default max tokens", R.string.config_label_default_max_tokens)
+  val MODEL_CONTEXT_LENGTH =
+    ConfigKey("model_context_length", "Model context length", R.string.config_label_model_context_length)
   val DEFAULT_TOPK = ConfigKey("default_topk", "Default TopK", R.string.config_label_default_topk)
   val DEFAULT_TOPP = ConfigKey("default_topp", "Default TopP", R.string.config_label_default_topp)
   val DEFAULT_TEMPERATURE =
@@ -86,8 +89,6 @@ object ConfigKeys {
       "Support speculative decoding",
       R.string.config_label_support_speculative_decoding,
     )
-  val ENABLE_THINKING =
-    ConfigKey("enable_thinking", "Enable thinking", R.string.config_label_enable_thinking)
   val ENABLE_SPECULATIVE_DECODING =
     ConfigKey(
       "enable_speculative_decoding",
@@ -280,21 +281,30 @@ fun createLlmChatConfigs(
   defaultTopP: Float = DEFAULT_TOPP,
   defaultTemperature: Float = DEFAULT_TEMPERATURE,
   accelerators: List<Accelerator> = DEFAULT_ACCELERATORS,
-  supportThinking: Boolean = false,
   supportSpeculativeDecoding: Boolean = false,
 ): List<Config> {
   var maxTokensConfig: Config =
     LabelConfig(key = ConfigKeys.MAX_TOKENS, defaultValue = "$defaultMaxToken")
-  if (defaultMaxContextLength != null) {
+  if (defaultMaxContextLength != null && defaultMaxContextLength > 0) {
+    val minTokenCount = minOf(256, defaultMaxContextLength)
     maxTokensConfig =
       NumberSliderConfig(
         key = ConfigKeys.MAX_TOKENS,
-        sliderMin = 2000f,
+        sliderMin = minTokenCount.toFloat(),
         sliderMax = defaultMaxContextLength.toFloat(),
-        defaultValue = defaultMaxToken.toFloat(),
+        defaultValue = defaultMaxToken.coerceIn(minTokenCount, defaultMaxContextLength).toFloat(),
         valueType = ValueType.INT,
       )
   }
+  val defaultAccelerator =
+    if (
+      Build.VERSION.SDK_INT <= Build.VERSION_CODES.R &&
+        accelerators.contains(Accelerator.CPU)
+    ) {
+      Accelerator.CPU.label
+    } else {
+      accelerators[0].label
+    }
   val configs =
     listOf(
         maxTokensConfig,
@@ -321,15 +331,12 @@ fun createLlmChatConfigs(
         ),
         SegmentedButtonConfig(
           key = ConfigKeys.ACCELERATOR,
-          defaultValue = accelerators[0].label,
+          defaultValue = defaultAccelerator,
           options = accelerators.map { it.label },
         ),
       )
       .toMutableList()
 
-  if (supportThinking) {
-    configs.add(BooleanSwitchConfig(key = ConfigKeys.ENABLE_THINKING, defaultValue = false))
-  }
   if (supportSpeculativeDecoding) {
     configs.add(
       BooleanSwitchConfig(key = ConfigKeys.ENABLE_SPECULATIVE_DECODING, defaultValue = false)

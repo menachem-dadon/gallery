@@ -49,6 +49,9 @@ android {
     buildConfigField("String", "FEEDBACK_API_KEY", "\"\"")
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    ndk {
+      abiFilters += listOf("arm64-v8a")
+    }
   }
 
   buildTypes {
